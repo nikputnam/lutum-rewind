@@ -74,11 +74,16 @@ progress { width: 220px; vertical-align: middle; }
 <p class="sub">Resume a paused clay print from where the bead actually stopped.</p>
 
 <section id="hostedNote" hidden>
-  <h2>This copy can't reach your printer</h2>
-  <p class="msg">Browsers block pages served over https from talking to a printer on plain http, so from here the
-    printer controls won't connect. You can still use it offline: load your G-code, type the nozzle position,
-    click <b>Find</b> and save the resume file.</p>
-  <p class="msg">For the full workflow, install the page <b>on the printer</b> and open it from there:</p>
+  <h2>Loaded from the web, not from the printer</h2>
+  <p class="msg">You can use this copy offline: load your G-code, type the nozzle position, click <b>Find</b>
+    and save the resume file.</p>
+  <p class="msg">To control the printer from this copy, enter its address below, and keep this tab open when you switch
+    to the printer's WiFi. The printer must allow pages from other sites to talk to it (CORS): in
+    <span class="mono">config.g</span> change <span class="mono">M586 P0 S1</span> to
+    <span class="mono">M586 P0 S1 C"*"</span> and restart. Your browser may also ask for permission to reach devices on
+    your local network. <span id="httpsWarn" hidden>Some browsers also block https pages from reaching plain-http
+    devices at all.</span></p>
+  <p class="msg">If it won't connect, install the page <b>on the printer</b>. That always works:</p>
   <ol class="steps">
     <li><a id="selfDownload" href="rewind.html" download="rewind.html">Download rewind.html</a>.</li>
     <li>Copy it to the <span class="mono">www</span> folder of the printer's SD card, or run
@@ -411,6 +416,8 @@ if (typeof module !== "undefined") module.exports = { parseWords, scanGcode, bui
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
+const FROM_PRINTER = location.protocol === "http:" &&
+  /^(\d+\.){3}\d+$|\.local$|^localhost$/.test(location.hostname);
 const S = {
   connected: false, sessionKey: null, busy: false, pollTimer: null,
   status: null, job: null, pos: null,
@@ -550,7 +557,8 @@ $("btnConnect").onclick = async () => {
   } catch (e) {
     S.connected = false;
     renderStatus();
-    log("Connect failed: " + e.message + (location.protocol === "https:" ? " (an https page cannot reach the printer; open this page from the printer instead)" : ""), "bad");
+    log("Connect failed: " + e.message + (FROM_PRINTER ? "" :
+      " (this page came from the web: check the printer's CORS setting M586 P0 S1 C\"*\", the browser's local-network permission, or install the page on the printer)"), "bad");
   }
   updateButtons();
 };
@@ -825,12 +833,15 @@ function updateButtons() {
 
 // ---- init ----
 (function init() {
-  if (location.protocol === "http:") $("host").value = location.origin;
-  const h = recall("host");
-  if (h && location.protocol !== "http:") $("host").value = h;
-  if (location.protocol === "https:") $("hostedNote").hidden = false;
+  if (FROM_PRINTER) $("host").value = location.origin;
+  else {
+    const h = recall("host");
+    if (h) $("host").value = h;
+    if (location.protocol !== "file:") $("hostedNote").hidden = false;
+    if (location.protocol === "https:") $("httpsWarn").hidden = false;
+  }
   updateButtons();
-  if (location.protocol === "http:" && /^(\d+\.){3}\d+|\.local$/.test(location.hostname)) $("btnConnect").click();
+  if (FROM_PRINTER) $("btnConnect").click();
 })();
 </script>
 </body>
