@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LUTUM Rewind</title>
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1c1a; --muted: #6b6862; --line: #dedbd4;
+  --accent: #b5562b; --accent-ink: #ffffff; --ok: #2f7d4f; --warn: #a86a00; --bad: #b3261e;
+  --code-bg: #f0eee9; --sel: #fbeee6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161514; --card: #1f1e1c; --ink: #ece9e3; --muted: #9c978e; --line: #34322e;
+    --accent: #e07a48; --accent-ink: #1a0f08; --ok: #5fbf85; --warn: #e0a640; --bad: #f07167;
+    --code-bg: #181715; --sel: #3a2a20;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161514; --card: #1f1e1c; --ink: #ece9e3; --muted: #9c978e; --line: #34322e;
+  --accent: #e07a48; --accent-ink: #1a0f08; --ok: #5fbf85; --warn: #e0a640; --bad: #f07167;
+  --code-bg: #181715; --sel: #3a2a20;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 16px 16px 64px; }
+h1 { font-size: 22px; margin: 8px 0 2px; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+section h2 { font-size: 16px; margin: 0 0 10px; display: flex; gap: 8px; align-items: baseline; }
+section h2 .n { color: var(--accent); font-variant-numeric: tabular-nums; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 6px 0; }
+label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 3px; }
+label.inline { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
+input[type=text], input[type=password], input[type=number], select {
+  font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--ink); min-width: 0; }
+input[type=number] { width: 96px; }
+input.wide { width: 230px; max-width: 100%; }
+button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.danger { background: var(--bad); color: #fff; border-color: var(--bad); font-weight: 600; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; margin-top: 8px; }
+.status b { font-weight: 600; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  border: 1px solid currentColor; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .muted { color: var(--muted); }
+.mono, pre, td.num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  font-size: 12px; overflow-x: auto; margin: 8px 0; max-height: 340px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+th:first-child, td:first-child { text-align: center; }
+tr.sel td { background: var(--sel); }
+tbody tr { cursor: pointer; }
+.note { font-size: 13px; color: var(--muted); margin: 6px 0; }
+.msg { font-size: 13px; margin: 6px 0; }
+ol.steps { margin: 0; padding-left: 20px; font-size: 14px; }
+ol.steps li { margin: 2px 0; }
+details summary { cursor: pointer; font-size: 14px; color: var(--muted); margin: 6px 0; }
+progress { width: 220px; vertical-align: middle; }
+#log { max-height: 180px; }
+</style>
+</head>
+<body>
+<main>
+<h1>LUTUM Rewind</h1>
+<p class="sub">Resume a paused clay print from where the bead actually stopped.</p>
+
+<section id="hostedNote" hidden>
+  <h2>This copy can't reach your printer</h2>
+  <p class="msg">Browsers block pages served over https from talking to a printer on plain http, so from here the
+    printer controls won't connect. You can still use it offline: load your G-code, type the nozzle position,
+    click <b>Find</b> and save the resume file.</p>
+  <p class="msg">For the full workflow, install the page <b>on the printer</b> and open it from there:</p>
+  <ol class="steps">
+    <li><a id="selfDownload" href="rewind.html" download="rewind.html">Download rewind.html</a>.</li>
+    <li>Copy it to the <span class="mono">www</span> folder of the printer's SD card, or run
+      <span class="mono">python3 lutum_rewind.py --host &lt;printer-ip&gt; --install-page</span>.</li>
+    <li>On the printer's WiFi, open <span class="mono">http://&lt;printer-ip&gt;/rewind.html</span>.</li>
+  </ol>
+</section>
+
+<section>
+  <ol class="steps">
+    <li>Pause the print (Duet / RepRapFirmware). Fix the clay feed and prime the nozzle by hand.</li>
+    <li>Jog the nozzle onto the <b>end of the last good bead</b>, just touching its top.</li>
+    <li>Connect below, load the job's G-code, click <b>Find</b>, check the match.</li>
+    <li>Upload the resume file, then <b>Cancel &amp; resume</b>. Don't home or move the axes in between.</li>
+  </ol>
+</section>
+
+<section id="s-printer">
+  <h2><span class="n">1</span> Printer</h2>
+  <div class="row">
+    <label>Printer address<input id="host" type="text" class="wide" placeholder="http://192.168.2.100"></label>
+    <label>Password<input id="password" type="password" placeholder="reprap"></label>
+    <button id="btnConnect" class="primary">Connect</button>
+  </div>
+  <div class="status" id="liveStatus"><span class="muted">Not connected.</span></div>
+</section>
+
+<section id="s-gcode">
+  <h2><span class="n">2</span> G-code of the paused job</h2>
+  <div class="row">
+    <label>Local copy (fastest)<input id="file" type="file" accept=".gcode,.g,.nc,.txt"></label>
+    <button id="btnDownload" disabled>Download from printer</button>
+    <progress id="dlProgress" max="1" value="0" hidden></progress>
+  </div>
+  <div class="msg" id="fileInfo"><span class="muted">No file loaded.</span></div>
+</section>
+
+<section id="s-find">
+  <h2><span class="n">3</span> Find the resume point</h2>
+  <div class="row">
+    <label>Nozzle X<input id="tx" type="number" step="0.01"></label>
+    <label>Y<input id="ty" type="number" step="0.01"></label>
+    <label>Z<input id="tz" type="number" step="0.01"></label>
+    <button id="btnUsePos" disabled>Use current nozzle position</button>
+  </div>
+  <div class="row">
+    <label>XY tolerance (mm)<input id="tol" type="number" step="0.5" value="4"></label>
+    <label class="inline"><input id="limitToPos" type="checkbox" checked> Only search what has already printed</label>
+    <button id="btnFind" class="primary" disabled>Find</button>
+  </div>
+  <div class="msg" id="findMsg"></div>
+  <div class="tablewrap"><table id="cands" hidden>
+    <thead><tr><th></th><th>dist</th><th>dXY</th><th>G-code Z</th><th>nozzle − G-code</th><th>layer</th><th>line</th><th>file %</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <pre id="context" hidden></pre>
+</section>
+
+<section id="s-opts">
+  <h2><span class="n">4</span> Resume settings</h2>
+  <div class="row">
+    <label>Method
+      <select id="method">
+        <option value="resurrect">Small resurrect.g that seeks into the original file (fast)</option>
+        <option value="file">Full trimmed copy of the file (slow to upload)</option>
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label>Lift before travel (mm)<input id="lift" type="number" step="0.5" value="5"></label>
+    <label>Z shift (mm)<input id="zshift" type="number" step="0.1" value="0"></label>
+    <label class="inline"><input id="zFromTouch" type="checkbox"> Use the nozzle's Z instead of the G-code Z</label>
+  </div>
+  <details>
+    <summary>More settings</summary>
+    <div class="row">
+      <label>Prime (extruder mm)<input id="prime" type="number" step="0.5" value="0"></label>
+      <label>Prime feed (mm/min)<input id="primeFeed" type="number" value="300"></label>
+      <label>Wait after prime (s)<input id="dwell" type="number" step="0.5" value="0"></label>
+      <label>Travel feed (mm/min)<input id="travelFeed" type="number" value="3000"></label>
+      <label>Z feed (mm/min)<input id="zFeed" type="number" value="600"></label>
+    </div>
+  </details>
+  <p class="note">Negative Z shift lowers the rest of the print, e.g. −0.5 to squash onto a layer that slumped. The shift
+    stays in effect until the axes are homed again.</p>
+  <div class="msg" id="genMsg"></div>
+  <pre id="preview" hidden></pre>
+  <div class="row"><button id="btnSave" disabled>Save resume file to this computer</button></div>
+</section>
+
+<section id="s-send">
+  <h2><span class="n">5</span> Send to printer</h2>
+  <div class="row">
+    <button id="btnUpload" class="primary" disabled>Upload resume file</button>
+    <button id="btnResume" class="danger" disabled>Cancel paused job &amp; resume</button>
+    <a id="backupLink" hidden>Download previous resurrect.g</a>
+  </div>
+  <div class="msg" id="sendMsg"></div>
+  <p class="note">Resume cancels the paused job (on a stock LUTUM cancel.g is empty, so nothing moves; check yours) and then runs
+    <span class="mono">M916</span> (or <span class="mono">M32</span> for the full-file method).
+    The resume lifts, travels above the point, lowers and continues.</p>
+</section>
+
+<section>
+  <h2>Log</h2>
+  <pre id="log"></pre>
+</section>
+</main>
+
+<!-- ====================================================================== -->
+<!-- Core: G-code scanning and resume-file building (no DOM; tested in Node) -->
+<!-- ====================================================================== -->
+<script id="core">
+"use strict";
+const MODAL_CMDS = new Set(["G20", "G21", "M572", "M221", "M220", "M204", "M201", "M203", "M566"]);
+const WORD_RE = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
+
+function parseWords(code) {
+  code = code.toUpperCase();
+  WORD_RE.lastIndex = 0;
+  let m = WORD_RE.exec(code);
+  if (m && m[1] === "N") m = WORD_RE.exec(code);
+  if (!m || "GMT".indexOf(m[1]) < 0) return null;
+  const cmd = m[1] + String(Math.trunc(parseFloat(m[2])));
+  const p = {};
+  while ((m = WORD_RE.exec(code)) !== null) {
+    if (!(m[1] in p)) p[m[1]] = parseFloat(m[2]);
+  }
+  return { cmd, p };
+}
+
+function segXYProject(px, py, x0, y0, x1, y1) {
+  const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy;
+  let t = L2 < 1e-12 ? 0 : ((px - x0) * dx + (py - y0) * dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  return [t, Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy))];
+}
+
+/*
+ * text: the file decoded one-char-per-byte (windows-1252/latin1), so string
+ * index == byte offset.  Collects "passes": runs of consecutive extruding moves
+ * whose XY path comes within tol of the touch point.
+ */
+async function scanGcode(text, touch, limit, tol, onProgress) {
+  const [tx, ty, tz] = touch;
+  const st = { x: null, y: null, z: null, e: 0, f: null, absXYZ: true, absE: false, tool: null, layer: 0 };
+  let modal = {};
+  const passes = [];
+  let cur = null, lastCandMove = -10, moveIdx = 0, nearest = null;
+  const warnings = new Set();
+  const end = limit == null ? text.length : Math.min(limit, text.length);
+  let off = 0, lineNo = 0, tick = 0;
+
+  while (off < text.length) {
+    const start = off;
+    if (limit != null && start >= limit) break;
+    let nl = text.indexOf("\n", off);
+    if (nl < 0) nl = text.length - 1;
+    off = nl + 1;
+    lineNo++;
+    if (++tick === 100000) {
+      tick = 0;
+      if (onProgress) await onProgress(start / end);
+    }
+    const line = text.slice(start, off);
+    const semi = line.indexOf(";");
+    const code = semi >= 0 ? line.slice(0, semi) : line;
+    if (semi >= 0) {
+      const c = line.slice(semi + 1).trim().toUpperCase();
+      if (c.startsWith("LAYER_CHANGE") || c.startsWith("LAYER:")) st.layer++;
+    }
+    if (!code.trim()) continue;
+    const w = parseWords(code);
+    if (!w) continue;
+    const { cmd, p } = w;
+
+    if (cmd === "G0" || cmd === "G1" || cmd === "G2" || cmd === "G3") {
+      moveIdx++;
+      if ("F" in p) st.f = p.F;
+      const x0 = st.x, y0 = st.y, z0 = st.z, e0 = st.e;
+      const nxt = {};
+      for (const a of ["X", "Y", "Z"]) {
+        const k = a.toLowerCase();
+        if (a in p) nxt[k] = st.absXYZ ? p[a] : (st[k] == null ? null : st[k] + p[a]);
+        else nxt[k] = st[k];
+      }
+      let de = 0;
+      if ("E" in p) {
+        if (st.absE) { de = p.E - e0; st.e = p.E; }
+        else { de = p.E; st.e = e0 + de; }
+      }
+      const x1 = nxt.x, y1 = nxt.y, z1 = nxt.z;
+      st.x = x1; st.y = y1; st.z = z1;
+      const known = [x0, y0, z0, x1, y1, z1].every(v => v != null);
+      const moved = known && (Math.abs(x1 - x0) + Math.abs(y1 - y0) + Math.abs(z1 - z0) > 1e-9);
+      if (!(de > 1e-9 && moved)) continue;
+      if (cmd === "G2" || cmd === "G3") warnings.add("arc moves (G2/G3) present: matched as straight chords");
+
+      const [t, dxy] = segXYProject(tx, ty, x0, y0, x1, y1);
+      const zAt = z0 + t * (z1 - z0);
+      const d3 = Math.hypot(dxy, zAt - tz);
+      const mk = () => ({
+        lineNo, start, end: off, t, dxy, a: [x0, y0, z0], b: [x1, y1, z1], e0, de, cmd,
+        f: st.f, absE: st.absE, absXYZ: st.absXYZ, tool: st.tool, layer: st.layer,
+        modal: Object.assign({}, modal), zAt, d3, text: line.replace(/[\r\n]+$/, "")
+      });
+      if (nearest === null || d3 < nearest.d3) nearest = mk();
+      if (dxy > tol) continue;
+      if (cur !== null && lastCandMove === moveIdx - 1) {
+        if (d3 < cur.d3) Object.assign(cur, mk());
+      } else {
+        cur = mk();
+        passes.push(cur);
+      }
+      lastCandMove = moveIdx;
+      continue;
+    }
+
+    if (cmd === "G90") st.absXYZ = true;
+    else if (cmd === "G91") st.absXYZ = false;
+    else if (cmd === "M82") st.absE = true;
+    else if (cmd === "M83") st.absE = false;
+    else if (cmd === "G92") {
+      if (Object.keys(p).length === 0) { st.x = st.y = st.z = 0; st.e = 0; }
+      for (const a of ["X", "Y", "Z", "E"]) if (a in p) st[a.toLowerCase()] = p[a];
+    } else if (cmd === "G28") {
+      let axes = ["X", "Y", "Z"].filter(a => a in p);
+      if (!axes.length) axes = ["X", "Y", "Z"];
+      for (const a of axes) st[a.toLowerCase()] = null;
+    } else if (cmd === "G20") warnings.add("file uses inches (G20): not supported, results will be wrong");
+    else if (/^T-?\d+$/.test(cmd)) st.tool = cmd;
+    if (MODAL_CMDS.has(cmd)) {
+      let key = (cmd === "G20" || cmd === "G21") ? "units" : cmd;
+      if ("D" in p) key += "D" + fmtG(p.D);
+      modal[key] = code.trim();
+    }
+  }
+  return { passes, nearest, warnings: [...warnings].sort(), scanned: off };
+}
+
+function fmtG(v) {                       // like Python's %g for small ints
+  return String(Number(v.toPrecision(6)));
+}
+
+function fmt(v) {
+  let s = v.toFixed(4);
+  if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+  return (s === "-0" || s === "") ? "0" : s;
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+function stamp(d) {
+  d = d || new Date();
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " +
+    pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+
+/* Returns {lines, resumeOff, start:[x,y,z], zshift, mode} */
+function buildResume(cand, opts, sourceName, touch, now) {
+  if (!cand.absXYZ) throw new Error("The chosen point lies inside a G91 (relative XYZ) block; cannot resume there.");
+  const [x0, y0, z0] = cand.a, [x1, y1, z1] = cand.b;
+  let t = cand.t, mode;
+  if (cand.cmd === "G2" || cand.cmd === "G3" || t < 0.01) { mode = "whole"; t = 0; }
+  else if (t > 0.99) { mode = "skip"; t = 1; }
+  else mode = "split";
+  const sx = x0 + t * (x1 - x0), sy = y0 + t * (y1 - y0), sz = z0 + t * (z1 - z0);
+  const eStart = cand.e0 + t * cand.de;
+  const f = cand.f;
+  let zshift = opts.zShift;
+  if (opts.zFromTouch) zshift += touch[2] - sz;
+
+  const H = [];
+  H.push("; ==== LUTUM rewind resume file ====");
+  H.push("; source       : " + sourceName);
+  H.push("; resumes at   : line " + cand.lineNo + " (byte " + cand.start + "), layer " + (cand.layer || "?") +
+         ", " + Math.round(t * 100) + "% of that move");
+  H.push("; original line: " + cand.text.trim());
+  H.push("; gcode point  : X" + fmt(sx) + " Y" + fmt(sy) + " Z" + fmt(sz));
+  H.push("; nozzle touch : X" + fmt(touch[0]) + " Y" + fmt(touch[1]) + " Z" + fmt(touch[2]));
+  H.push("; z shift      : " + fmt(zshift) + " mm");
+  H.push("; generated    : " + stamp(now));
+  H.push("G21");
+  for (const k of Object.keys(cand.modal || {}).sort()) {
+    if (k !== "units") H.push(cand.modal[k] + "   ; restored modal setting");
+  }
+  if (cand.tool) H.push(cand.tool + "   ; restore tool");
+  H.push("G90");
+  H.push("M83");
+  H.push("G91");
+  H.push("G1 Z" + fmt(opts.lift) + " F" + fmt(opts.zFeed) + "   ; lift clear of the print");
+  H.push("G90");
+  H.push("G1 X" + fmt(sx) + " Y" + fmt(sy) + " F" + fmt(opts.travelFeed) + "   ; travel above the resume point");
+  H.push("G1 Z" + fmt(sz + zshift) + " F" + fmt(opts.zFeed) + "   ; lower onto the resume point");
+  if (Math.abs(zshift) > 1e-6) H.push("G92 Z" + fmt(sz) + "   ; shift Z so the rest of the file lines up with the actual print");
+  if (opts.prime > 0) H.push("G1 E" + fmt(opts.prime) + " F" + fmt(opts.primeFeed) + "   ; prime");
+  if (opts.dwell > 0) H.push("G4 S" + fmt(opts.dwell));
+  if (cand.absE) {
+    H.push("M82");
+    H.push("G92 E" + fmt(eStart) + "   ; extruder position at the resume point");
+  }
+  if (f) H.push("G1 F" + fmt(f) + "   ; print feedrate in effect at the resume point");
+  H.push("; ---- continuing original file ----");
+
+  let resumeOff;
+  if (mode === "split") {
+    const eWord = cand.absE ? cand.e0 + cand.de : cand.de * (1 - t);
+    H.push("G1 X" + fmt(x1) + " Y" + fmt(y1) + " Z" + fmt(z1) + " E" + fmt(eWord) + (f ? " F" + fmt(f) : "") +
+           "   ; remainder of the interrupted move");
+    resumeOff = cand.end;
+  } else if (mode === "skip") resumeOff = cand.end;
+  else resumeOff = cand.start;
+  return { lines: H, resumeOff, start: [sx, sy, sz], zshift, mode };
+}
+
+function resurrectText(lines, resumeOff, jobName) {
+  const L = lines.slice();
+  L.splice(1, 0, "; run with M916 after cancelling the paused job");
+  L.push('M23 "' + jobName + '"');
+  L.push("M26 S" + resumeOff);
+  L.push("M24");
+  return L.join("\n") + "\n";
+}
+
+if (typeof module !== "undefined") module.exports = { parseWords, scanGcode, buildResume, resurrectText, fmt };
+</script>
+
+<!-- ====================================================================== -->
+<!-- UI and Duet HTTP API                                                     -->
+<!-- ====================================================================== -->
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const S = {
+  connected: false, sessionKey: null, busy: false, pollTimer: null,
+  status: null, job: null, pos: null,
+  gcodeBlob: null, gcodeText: null, gcodeName: null,
+  passes: [], ranked: [], chosen: 0,
+  built: null, generatedText: null, uploadedText: null, uploadedRemote: null,
+};
+
+function log(msg, cls) {
+  const el = $("log");
+  const line = "[" + new Date().toLocaleTimeString() + "] " + msg + "\n";
+  el.textContent += line;
+  el.scrollTop = el.scrollHeight;
+  if (cls === "bad") console.error(msg);
+}
+function setMsg(id, html, cls) { const el = $(id); el.className = "msg " + (cls || ""); el.innerHTML = html; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function store(k, v) { try { localStorage.setItem("lutumRewind." + k, v); } catch (e) {} }
+function recall(k) { try { return localStorage.getItem("lutumRewind." + k); } catch (e) { return null; } }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function num(id) { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; }
+
+// ---- Duet API (requests are serialized: the Duet's WiFi has few sockets) ----
+let chain = Promise.resolve();
+function serial(fn) { const p = chain.then(fn, fn); chain = p.catch(() => {}); return p; }
+
+function base() {
+  let h = $("host").value.trim();
+  if (!h) return "";
+  if (!/^https?:\/\//.test(h)) h = "http://" + h;
+  return h.replace(/\/+$/, "");
+}
+
+async function raw(path, params, init, retry = true) {
+  const url = base() + path + (params ? "?" + new URLSearchParams(params) : "");
+  init = Object.assign({ cache: "no-store" }, init || {});
+  init.headers = Object.assign({}, init.headers || {});
+  if (S.sessionKey != null) init.headers["X-Session-Key"] = String(S.sessionKey);
+  const r = await fetch(url, init);
+  if (r.status === 401 && retry && path !== "/rr_connect") {
+    await connectRaw();
+    return raw(path, params, init, false);
+  }
+  if (!r.ok) throw new Error(path + " → HTTP " + r.status);
+  return r;
+}
+async function jsonReq(path, params, init) { return (await raw(path, params, init)).json(); }
+
+async function connectRaw() {
+  const r = await (await raw("/rr_connect", { password: $("password").value || "reprap", time: new Date().toISOString().slice(0, 19) })).json();
+  if (r.err) throw new Error(r.err === 1 ? "wrong password" : "rr_connect error " + r.err);
+  S.sessionKey = r.sessionKey != null ? r.sessionKey : null;
+  return r;
+}
+const api = {
+  connect: () => serial(connectRaw),
+  model: key => serial(async () => (await jsonReq("/rr_model", { key, flags: "d99vn" })).result),
+  gcode: cmd => serial(async () => {
+    await jsonReq("/rr_gcode", { gcode: cmd });
+    await sleep(300);
+    return (await (await raw("/rr_reply")).text()).trim();
+  }),
+  upload: (name, body) => serial(async () => {
+    const r = await jsonReq("/rr_upload", { name, time: new Date().toISOString().slice(0, 19) },
+      { method: "POST", body, headers: { "Content-Type": "application/octet-stream" } });
+    if (r.err) throw new Error("upload failed (err " + r.err + ")");
+  }),
+  download: (name, onProgress) => serial(async () => {
+    const r = await raw("/rr_download", { name });
+    const total = +r.headers.get("Content-Length") || 0;
+    if (!r.body || !r.body.getReader) return r.blob();
+    const reader = r.body.getReader(), parts = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value); got += value.length;
+      if (onProgress) onProgress(got, total);
+    }
+    return new Blob(parts);
+  }),
+  exists: name => serial(async () => {
+    try { const r = await raw("/rr_download", { name }); return await r.text(); }
+    catch (e) { return null; }
+  }),
+};
+
+// ---- live status ----
+function renderStatus() {
+  const el = $("liveStatus");
+  if (!S.connected) { el.innerHTML = '<span class="muted">Not connected.</span>'; return; }
+  const st = S.status || "?";
+  const cls = st === "paused" ? "ok" : (st === "processing" || st === "pausing" ? "warn" : "muted");
+  const jf = (S.job && S.job.file) || {};
+  const p = S.pos;
+  el.innerHTML =
+    '<span>Status <span class="pill ' + cls + '">' + esc(st) + "</span></span>" +
+    "<span>Job <b class=mono>" + esc(jf.fileName || "none") + "</b></span>" +
+    (S.job && S.job.layer != null ? "<span>Layer <b>" + S.job.layer + "</b></span>" : "") +
+    (p ? "<span>Nozzle <b class=mono>X" + p[0].toFixed(2) + " Y" + p[1].toFixed(2) + " Z" + p[2].toFixed(2) + "</b></span>" : "");
+}
+
+async function refresh() {
+  const [status, axes] = [await api.model("state.status"), await api.model("move.axes")];
+  S.status = status;
+  const pos = {};
+  for (const a of axes || []) pos[a.letter] = a.userPosition;
+  S.pos = ["X", "Y", "Z"].every(k => typeof pos[k] === "number") ? [pos.X, pos.Y, pos.Z] : null;
+  if (status === "paused" || status === "processing" || status === "pausing" || !S.job) {
+    const job = await api.model("job");
+    if (job && job.file && job.file.fileName) S.job = job;
+  }
+  renderStatus();
+  updateFileInfo();
+  updateButtons();
+}
+
+function startPolling() {
+  clearInterval(S.pollTimer);
+  S.pollTimer = setInterval(async () => {
+    if (S.busy || document.hidden) return;
+    try { await refresh(); } catch (e) { /* transient; next poll retries */ }
+  }, 2500);
+}
+
+$("btnConnect").onclick = async () => {
+  store("host", $("host").value.trim());
+  if (!base()) { setMsg("findMsg", ""); log("Enter the printer address first.", "bad"); return; }
+  try {
+    const info = await api.connect();
+    S.connected = true;
+    log("Connected to " + base() + " (" + (info.boardType || "Duet") + ")");
+    S.job = null;
+    await refresh();
+    if (S.pos && !$("tx").value) fillTouchFromPrinter();
+    startPolling();
+  } catch (e) {
+    S.connected = false;
+    renderStatus();
+    log("Connect failed: " + e.message + (location.protocol === "https:" ? " (an https page cannot reach the printer; open this page from the printer instead)" : ""), "bad");
+  }
+  updateButtons();
+};
+
+function fillTouchFromPrinter() {
+  if (!S.pos) return;
+  $("tx").value = S.pos[0].toFixed(3); $("ty").value = S.pos[1].toFixed(3); $("tz").value = S.pos[2].toFixed(3);
+  invalidateResults();
+}
+$("btnUsePos").onclick = async () => {
+  try { await refresh(); fillTouchFromPrinter(); log("Nozzle position read from printer."); }
+  catch (e) { log("Could not read position: " + e.message, "bad"); }
+};
+
+// ---- G-code loading ----
+async function loadBlob(blob, name) {
+  S.gcodeBlob = blob; S.gcodeName = name; S.gcodeText = null;
+  setMsg("fileInfo", "Reading " + esc(name) + " …");
+  const buf = await blob.arrayBuffer();
+  S.gcodeText = new TextDecoder("latin1").decode(buf);     // 1 char per byte → offsets == bytes
+  invalidateResults();
+  updateFileInfo();
+  updateButtons();
+}
+$("file").onchange = async e => {
+  const f = e.target.files[0];
+  if (f) { await loadBlob(f, f.name); log("Loaded local file " + f.name + " (" + Math.round(f.size / 1024) + " kB)."); }
+};
+$("btnDownload").onclick = async () => {
+  const jf = S.job && S.job.file;
+  if (!jf) return;
+  S.busy = true; updateButtons();
+  const prog = $("dlProgress"); prog.hidden = false; prog.value = 0;
+  const t0 = Date.now();
+  try {
+    log("Downloading " + jf.fileName + " … (a local copy is much faster)");
+    const blob = await api.download(jf.fileName, (got, total) => {
+      prog.value = total ? got / total : 0;
+      setMsg("fileInfo", "Downloading … " + Math.round(got / 1024) + " kB" + (total ? " of " + Math.round(total / 1024) + " kB" : "") +
+        " (" + Math.round(got / 1024 / Math.max((Date.now() - t0) / 1000, 0.001)) + " kB/s)");
+    });
+    await loadBlob(blob, jf.fileName.split("/").pop());
+    log("Downloaded " + Math.round(blob.size / 1024) + " kB.");
+  } catch (e) { log("Download failed: " + e.message, "bad"); }
+  prog.hidden = true; S.busy = false; updateButtons();
+};
+
+function updateFileInfo() {
+  if (!S.gcodeBlob) { setMsg("fileInfo", '<span class="muted">No file loaded.</span>'); return; }
+  let html = "<b class=mono>" + esc(S.gcodeName) + "</b>, " + S.gcodeBlob.size.toLocaleString() + " bytes";
+  const jf = S.job && S.job.file;
+  let cls = "";
+  if (jf && jf.size != null) {
+    if (jf.size === S.gcodeBlob.size) { html += ' <span class="ok">✓ same size as the printer\'s job file</span>'; }
+    else { html += ' <span class="bad">✗ printer\'s job is ' + jf.size.toLocaleString() + " bytes: not the same file</span>"; }
+  }
+  if (!S.gcodeText) html += " (reading…)";
+  setMsg("fileInfo", html, cls);
+}
+
+// ---- find ----
+function invalidateResults() {
+  S.ranked = []; S.built = null; S.generatedText = null;
+  $("cands").hidden = true; $("context").hidden = true; $("preview").hidden = true;
+  setMsg("findMsg", ""); setMsg("genMsg", "");
+  updateButtons();
+}
+["tx", "ty", "tz", "tol", "limitToPos"].forEach(id => $(id).addEventListener("change", invalidateResults));
+
+$("btnFind").onclick = async () => {
+  const touch = [num("tx"), num("ty"), num("tz")];
+  if (["tx", "ty", "tz"].some(id => $(id).value === "")) { setMsg("findMsg", "Enter or read the nozzle position first.", "bad"); return; }
+  let limit = null;
+  if ($("limitToPos").checked) {
+    if (S.job && S.job.filePosition != null) limit = S.job.filePosition;
+    else { setMsg("findMsg", "No file position from the printer; searching the whole file.", "warn"); }
+  }
+  S.busy = true; updateButtons();
+  const t0 = performance.now();
+  try {
+    const res = await scanGcode(S.gcodeText, touch, limit, num("tol") || 4, async frac => {
+      setMsg("findMsg", "Scanning … " + Math.round(frac * 100) + "%");
+      await sleep(0);
+    });
+    S.passes = res.passes;
+    for (const w of res.warnings) log("Warning: " + w, "bad");
+    log("Scanned " + Math.round(res.scanned / 1024) + " kB in " + ((performance.now() - t0) / 1000).toFixed(1) + " s, " +
+        res.passes.length + " passes within tolerance.");
+    if (!res.passes.length) {
+      setMsg("findMsg", res.nearest
+        ? "No toolpath within " + num("tol") + " mm in XY. Nearest extrusion is " + res.nearest.d3.toFixed(1) +
+          " mm away (line " + res.nearest.lineNo + "). Jog closer to the end of the bead or raise the tolerance."
+        : "No extrusion moves found before the current file position.", "bad");
+      $("cands").hidden = true;
+    } else {
+      S.ranked = res.passes.slice().sort((a, b) => a.d3 - b.d3).slice(0, 8);
+      S.chosen = 0;
+      const tied = S.ranked.length > 1 && Math.abs(S.ranked[0].d3 - S.ranked[1].d3) < 0.25;
+      setMsg("findMsg", "Passes under the nozzle, best first. The lost layers appear as passes <i>above</i> the nozzle (negative " +
+        "nozzle − G-code). Click a row to choose." + (tied ? ' <span class="warn">The top two are nearly tied; check the layer.</span>' : ""));
+      renderCands(touch);
+      rebuild();
+    }
+  } catch (e) { setMsg("findMsg", esc(e.message), "bad"); }
+  S.busy = false; updateButtons();
+};
+
+function renderCands(touch) {
+  const tb = $("cands").querySelector("tbody");
+  tb.innerHTML = "";
+  const total = S.gcodeText.length;
+  S.ranked.forEach((c, i) => {
+    const tr = document.createElement("tr");
+    if (i === S.chosen) tr.className = "sel";
+    tr.innerHTML =
+      '<td><input type="radio" name="cand" ' + (i === S.chosen ? "checked" : "") + "></td>" +
+      '<td class="num">' + c.d3.toFixed(2) + '</td><td class="num">' + c.dxy.toFixed(2) + "</td>" +
+      '<td class="num">' + c.zAt.toFixed(3) + '</td><td class="num">' + ((touch[2] - c.zAt) >= 0 ? "+" : "") + (touch[2] - c.zAt).toFixed(3) + "</td>" +
+      '<td class="num">' + (c.layer || "–") + '</td><td class="num">' + c.lineNo + '</td><td class="num">' + (100 * c.start / total).toFixed(1) + "</td>";
+    tr.onclick = () => { S.chosen = i; renderCands(touch); rebuild(); };
+    tb.appendChild(tr);
+  });
+  $("cands").hidden = false;
+  showContext(S.ranked[S.chosen]);
+}
+
+function showContext(c) {
+  const T = S.gcodeText;
+  let a = c.start;
+  for (let k = 0; k < 4 && a > 0; k++) a = T.lastIndexOf("\n", a - 2) + 1;
+  let b = c.end;
+  for (let k = 0; k < 3 && b < T.length; k++) { const n = T.indexOf("\n", b); b = n < 0 ? T.length : n + 1; }
+  const lines = T.slice(a, b).replace(/\r/g, "").split("\n").filter((l, i, arr) => i < arr.length - 1 || l);
+  const firstNo = c.lineNo - T.slice(a, c.start).split("\n").length + 1;
+  $("context").textContent = "Cut point in the original file:\n" + lines.map((l, i) => {
+    const n = firstNo + i;
+    return (n === c.lineNo ? ">> " : "   ") + String(n).padStart(8) + "  " + l;
+  }).join("\n");
+  $("context").hidden = false;
+}
+
+// ---- build ----
+function opts() {
+  return {
+    lift: num("lift"), zShift: num("zshift"), zFromTouch: $("zFromTouch").checked, prime: num("prime"),
+    primeFeed: num("primeFeed") || 300, dwell: num("dwell"), travelFeed: num("travelFeed") || 3000, zFeed: num("zFeed") || 600,
+  };
+}
+function jobPath() {
+  const jf = S.job && S.job.file;
+  if (jf && jf.fileName) return jf.fileName;
+  return "0:/gcodes/" + S.gcodeName;
+}
+function rebuild() {
+  S.built = null; S.generatedText = null;
+  const c = S.ranked[S.chosen];
+  if (!c) { updateButtons(); return; }
+  const touch = [num("tx"), num("ty"), num("tz")];
+  try {
+    const b = buildResume(c, opts(), jobPath(), touch);
+    S.built = b;
+    const method = $("method").value;
+    let preview;
+    if (method === "resurrect") {
+      S.generatedText = resurrectText(b.lines, b.resumeOff, jobPath());
+      preview = S.generatedText;
+    } else {
+      S.generatedText = b.lines.join("\n") + "\n";
+      preview = S.generatedText + "… then the original file from byte " + b.resumeOff + " to the end (" +
+        Math.round((S.gcodeBlob.size - b.resumeOff) / 1024) + " kB)\n";
+    }
+    $("preview").textContent = preview; $("preview").hidden = false;
+    let msg = "Resume point <b class=mono>X" + b.start[0].toFixed(3) + " Y" + b.start[1].toFixed(3) + " Z" + b.start[2].toFixed(3) +
+      "</b>, Z shift " + (b.zshift >= 0 ? "+" : "") + b.zshift.toFixed(3) + " mm.";
+    const dz = touch[2] - b.start[2];
+    if (Math.abs(dz) > 0.5 && !$("zFromTouch").checked)
+      msg += ' <span class="warn">The nozzle is ' + (dz > 0 ? "+" : "") + dz.toFixed(2) +
+             " mm from the G-code Z. Consider \"Use the nozzle's Z\" or a Z shift.</span>";
+    setMsg("genMsg", msg);
+  } catch (e) { setMsg("genMsg", esc(e.message), "bad"); $("preview").hidden = true; }
+  updateButtons();
+}
+["method", "lift", "zshift", "zFromTouch", "prime", "primeFeed", "dwell", "travelFeed", "zFeed"]
+  .forEach(id => $(id).addEventListener("input", rebuild));
+
+function outputBlob() {
+  if ($("method").value === "resurrect") return new Blob([S.generatedText], { type: "text/plain" });
+  return new Blob([S.generatedText, S.gcodeBlob.slice(S.built.resumeOff)], { type: "text/plain" });
+}
+function remotePath() {
+  if ($("method").value === "resurrect") return "0:/sys/resurrect.g";
+  const jp = jobPath(), dir = jp.lastIndexOf("/") >= 0 ? jp.slice(0, jp.lastIndexOf("/")) : "0:/gcodes";
+  return dir + "/rewind_" + jp.split("/").pop();
+}
+function saveBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+$("btnSave").onclick = () => saveBlob(outputBlob(), remotePath().split("/").pop());
+
+// ---- send ----
+$("btnUpload").onclick = async () => {
+  const remote = remotePath(), text = S.generatedText;
+  S.busy = true; updateButtons();
+  try {
+    if (remote.endsWith("/resurrect.g")) {
+      const old = await api.exists(remote);
+      if (old != null) {
+        const link = $("backupLink");
+        link.href = URL.createObjectURL(new Blob([old], { type: "text/plain" }));
+        link.download = "printer_resurrect_backup.g"; link.hidden = false;
+        log("Kept the printer's previous resurrect.g (download link next to the buttons).");
+      }
+    }
+    const blob = outputBlob();
+    setMsg("sendMsg", "Uploading " + Math.round(blob.size / 1024) + " kB to " + esc(remote) + " …");
+    await api.upload(remote, blob);
+    S.uploadedText = text; S.uploadedRemote = remote;
+    setMsg("sendMsg", '<span class="ok">Uploaded to <b class=mono>' + esc(remote) + "</b>.</span> Ready to resume.");
+    log("Uploaded " + remote + ".");
+  } catch (e) { setMsg("sendMsg", "Upload failed: " + esc(e.message), "bad"); log("Upload failed: " + e.message, "bad"); }
+  S.busy = false; updateButtons();
+};
+
+let armTimer = null;
+$("btnResume").onclick = async () => {
+  const btn = $("btnResume");
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = "1"; btn.textContent = "Click again to confirm";
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => { delete btn.dataset.armed; btn.textContent = "Cancel paused job & resume"; }, 5000);
+    return;
+  }
+  clearTimeout(armTimer); delete btn.dataset.armed; btn.textContent = "Cancel paused job & resume";
+  const startCmd = S.uploadedRemote.endsWith("/resurrect.g") ? "M916" : 'M32 "' + S.uploadedRemote + '"';
+  S.busy = true; updateButtons();
+  try {
+    let st = await api.model("state.status");
+    if (st === "paused") {
+      log("Cancelling paused job (M0) …");
+      await api.gcode("M0");
+      for (let i = 0; i < 60 && st !== "idle"; i++) { await sleep(500); st = await api.model("state.status"); }
+      if (st !== "idle") throw new Error("printer did not go idle after cancelling (status " + st + "); send " + startCmd + " from the console.");
+    } else if (st !== "idle") {
+      throw new Error("printer status is '" + st + "'; expected paused or idle.");
+    }
+    log("Sending " + startCmd + " …");
+    const reply = await api.gcode(startCmd);
+    if (reply) log("Printer replied: " + reply);
+    await sleep(1500);
+    st = await api.model("state.status");
+    setMsg("sendMsg", "Printer status: <b>" + esc(st) + "</b>" + (st === "processing" ? ' <span class="ok">✓ printing</span>' : ""),
+      st === "processing" ? "" : "warn");
+    log("Status after resume: " + st);
+  } catch (e) { setMsg("sendMsg", esc(e.message), "bad"); log(e.message, "bad"); }
+  S.busy = false; updateButtons();
+};
+
+function updateButtons() {
+  const haveFile = !!S.gcodeText;
+  $("btnDownload").disabled = S.busy || !S.connected || !(S.job && S.job.file && S.job.file.fileName);
+  $("btnUsePos").disabled = S.busy || !S.connected;
+  $("btnFind").disabled = S.busy || !haveFile;
+  $("btnSave").disabled = !S.generatedText;
+  $("btnUpload").disabled = S.busy || !S.connected || !S.generatedText;
+  const fresh = S.generatedText && S.uploadedText === S.generatedText && S.uploadedRemote === remotePath();
+  $("btnResume").disabled = S.busy || !S.connected || !fresh;
+  if (S.uploadedText && !fresh && S.generatedText) setMsg("sendMsg", "Settings changed since the last upload. Upload again before resuming.", "warn");
+}
+
+// ---- init ----
+(function init() {
+  if (location.protocol === "http:") $("host").value = location.origin;
+  const h = recall("host");
+  if (h && location.protocol !== "http:") $("host").value = h;
+  if (location.protocol === "https:") $("hostedNote").hidden = false;
+  updateButtons();
+  if (location.protocol === "http:" && /^(\d+\.){3}\d+|\.local$/.test(location.hostname)) $("btnConnect").click();
+})();
+</script>
+</body>
+</html>

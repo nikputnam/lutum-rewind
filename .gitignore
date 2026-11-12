@@ -1,0 +1,4 @@
+out/
+__pycache__/
+*.gcode
+.DS_Store
