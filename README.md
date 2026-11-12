@@ -14,12 +14,13 @@ print first.**
 2. Jog the nozzle onto the **end of the last good bead**, just touching its top.
 3. The tool reads the paused job and the nozzle position from the printer, finds that point in the G-code
    (every pass of the toolpath under the nozzle, ranked by distance; the lost layers show up as passes
-   above the nozzle), and writes a small `sys/resurrect.g` that:
+   above the nozzle), and writes a small macro, `0:/sys/lutum-rewind.g`, that:
    - lifts, travels above the point and lowers onto it,
    - restores extrusion mode, extruder position, feedrate, tool and pressure advance,
    - finishes the interrupted move from that exact point,
    - seeks into the original file (`M23` / `M26 S<byte offset>` / `M24`) and continues.
-4. It uploads that file, cancels the paused job and runs `M916`.
+4. It uploads that file, cancels the paused job and runs it with `M98`. The firmware's own power-loss file
+   `resurrect.g` is left alone, and `resurrect-prologue.g` isn't needed (unlike with `M916`).
 
 Only a few hundred bytes are uploaded, so you aren't waiting minutes for a big file over the Duet's WiFi
 while the clay dries.

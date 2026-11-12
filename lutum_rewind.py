@@ -380,12 +380,14 @@ def write_full_file(src, H, resume_off, out_path):
 
 def write_resurrect(H, resume_off, job_name, out_path):
     """
-    A small sys/resurrect.g in the same shape RRF writes after a pause or
-    power loss: set up, select the ORIGINAL file, seek to the byte offset and
-    resume it.  Only a few hundred bytes go over WiFi.
+    A small macro (0:/sys/lutum-rewind.g, run with M98) in the same shape as
+    the resurrect.g RRF writes after a pause or power loss: set up, select the
+    ORIGINAL file, seek to the byte offset and resume it.  Only a few hundred
+    bytes go over WiFi.  Not run via M916, which requires resurrect-prologue.g
+    to exist and would overwrite the firmware's power-loss file.
     """
     lines = list(H)
-    lines.insert(1, "; run with M916 after cancelling the paused job")
+    lines.insert(1, '; run with M98 P"0:/sys/lutum-rewind.g" after cancelling the paused job')
     lines.append('M23 "%s"' % job_name)
     lines.append("M26 S%d" % resume_off)
     lines.append("M24")
@@ -434,9 +436,9 @@ def main():
     ap.add_argument("--dwell", type=float, default=0.0, help="seconds to wait after priming")
     ap.add_argument("--travel-feed", type=float, default=3000.0)
     ap.add_argument("--z-feed", type=float, default=600.0)
-    ap.add_argument("--method", choices=["resurrect", "file"], default="resurrect",
-                    help="resurrect (default): upload a tiny sys/resurrect.g that seeks into the original "
-                         "file and run it with M916.  file: upload the whole trimmed remainder as a new job.")
+    ap.add_argument("--method", choices=["macro", "file"], default="macro",
+                    help="macro (default): upload a tiny 0:/sys/lutum-rewind.g that seeks into the original "
+                         "file and run it with M98.  file: upload the whole trimmed remainder as a new job.")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "out"))
     ap.add_argument("--yes", action="store_true", help="answer yes to every question (careful)")
     ap.add_argument("--install-page", action="store_true",
@@ -547,8 +549,8 @@ def main():
         out_path = os.path.join(opts.out, out_name)
         write_full_file(src, H, resume_off, out_path)
     else:
-        out_name = "resurrect.g"
-        out_path = os.path.join(opts.out, "resurrect_" + base + ".g")
+        out_name = "lutum-rewind.g"
+        out_path = os.path.join(opts.out, "lutum-rewind_" + base + ".g")
         write_resurrect(H, resume_off, job_name if ":" in job_name else "0:/gcodes/" + job_name, out_path)
     print("\nresume point X%.3f Y%.3f Z%.3f  (Z shift %+.3f, %s), file offset %d"
           % (sx, sy, sz, zshift, mode, resume_off))
@@ -563,21 +565,14 @@ def main():
         remote_dir = job_name.rsplit("/", 1)[0] if "/" in job_name else "0:/gcodes"
         remote = remote_dir + "/" + out_name
     else:
-        remote = "0:/sys/resurrect.g"
+        remote = "0:/sys/lutum-rewind.g"
     if not ask("\nUpload to printer as %s ?" % remote, True, opts.yes):
         return
     duet.connect()
-    if opts.method == "resurrect":
-        backup = os.path.join(opts.out, "printer_resurrect_backup.g")
-        try:
-            duet.download(remote, backup)
-            print("  saved the printer's previous resurrect.g to", backup)
-        except Exception as e:
-            print("  (no previous resurrect.g to back up: %s)" % e)
     duet.upload(remote, out_path)
     print("  uploaded.")
 
-    start_cmd = 'M32 "%s"' % remote if opts.method == "file" else "M916"
+    start_cmd = ('M32 "%s"' if opts.method == "file" else 'M98 P"%s"') % remote
     if not ask("Cancel the paused job and resume from the chosen point now (%s)?" % start_cmd, False, opts.yes):
         print("OK. To start it later: cancel the paused job in DWC, then send %s from the console." % start_cmd)
         print("Do not move or home the axes in between.")
@@ -594,6 +589,9 @@ def main():
     reply = duet.gcode(start_cmd)
     if reply:
         print("  printer replied:", reply)
+    if reply.lower().startswith("error"):
+        raise SystemExit("The printer refused %s. The job is cancelled; if nothing has moved, fix the cause "
+                         "and send %s from the console." % (start_cmd, start_cmd))
     time.sleep(1.5)
     print("printer status:", duet.status())
 

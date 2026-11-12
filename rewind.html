@@ -147,7 +147,7 @@ progress { width: 220px; vertical-align: middle; }
   <div class="row">
     <label>Method
       <select id="method">
-        <option value="resurrect">Small resurrect.g that seeks into the original file (fast)</option>
+        <option value="macro">Small macro that seeks into the original file (fast)</option>
         <option value="file">Full trimmed copy of the file (slow to upload)</option>
       </select>
     </label>
@@ -179,11 +179,10 @@ progress { width: 220px; vertical-align: middle; }
   <div class="row">
     <button id="btnUpload" class="primary" disabled>Upload resume file</button>
     <button id="btnResume" class="danger" disabled>Cancel paused job &amp; resume</button>
-    <a id="backupLink" hidden>Download previous resurrect.g</a>
   </div>
   <div class="msg" id="sendMsg"></div>
   <p class="note">Resume cancels the paused job (on a stock LUTUM cancel.g is empty, so nothing moves; check yours) and then runs
-    <span class="mono">M916</span> (or <span class="mono">M32</span> for the full-file method).
+    <span class="mono">M98 P"0:/sys/lutum-rewind.g"</span> (or <span class="mono">M32</span> for the full-file method).
     The resume lifts, travels above the point, lowers and continues.</p>
 </section>
 
@@ -400,7 +399,7 @@ function buildResume(cand, opts, sourceName, touch, now) {
 
 function resurrectText(lines, resumeOff, jobName) {
   const L = lines.slice();
-  L.splice(1, 0, "; run with M916 after cancelling the paused job");
+  L.splice(1, 0, '; run with M98 P"0:/sys/lutum-rewind.g" after cancelling the paused job');
   L.push('M23 "' + jobName + '"');
   L.push("M26 S" + resumeOff);
   L.push("M24");
@@ -722,7 +721,7 @@ function rebuild() {
     S.built = b;
     const method = $("method").value;
     let preview;
-    if (method === "resurrect") {
+    if (method === "macro") {
       S.generatedText = resurrectText(b.lines, b.resumeOff, jobPath());
       preview = S.generatedText;
     } else {
@@ -745,11 +744,11 @@ function rebuild() {
   .forEach(id => $(id).addEventListener("input", rebuild));
 
 function outputBlob() {
-  if ($("method").value === "resurrect") return new Blob([S.generatedText], { type: "text/plain" });
+  if ($("method").value === "macro") return new Blob([S.generatedText], { type: "text/plain" });
   return new Blob([S.generatedText, S.gcodeBlob.slice(S.built.resumeOff)], { type: "text/plain" });
 }
 function remotePath() {
-  if ($("method").value === "resurrect") return "0:/sys/resurrect.g";
+  if ($("method").value === "macro") return "0:/sys/lutum-rewind.g";
   const jp = jobPath(), dir = jp.lastIndexOf("/") >= 0 ? jp.slice(0, jp.lastIndexOf("/")) : "0:/gcodes";
   return dir + "/rewind_" + jp.split("/").pop();
 }
@@ -766,15 +765,6 @@ $("btnUpload").onclick = async () => {
   const remote = remotePath(), text = S.generatedText;
   S.busy = true; updateButtons();
   try {
-    if (remote.endsWith("/resurrect.g")) {
-      const old = await api.exists(remote);
-      if (old != null) {
-        const link = $("backupLink");
-        link.href = URL.createObjectURL(new Blob([old], { type: "text/plain" }));
-        link.download = "printer_resurrect_backup.g"; link.hidden = false;
-        log("Kept the printer's previous resurrect.g (download link next to the buttons).");
-      }
-    }
     const blob = outputBlob();
     setMsg("sendMsg", "Uploading " + Math.round(blob.size / 1024) + " kB to " + esc(remote) + " …");
     await api.upload(remote, blob);
@@ -795,7 +785,8 @@ $("btnResume").onclick = async () => {
     return;
   }
   clearTimeout(armTimer); delete btn.dataset.armed; btn.textContent = "Cancel paused job & resume";
-  const startCmd = S.uploadedRemote.endsWith("/resurrect.g") ? "M916" : 'M32 "' + S.uploadedRemote + '"';
+  const startCmd = S.uploadedRemote.endsWith(".gcode") || S.uploadedRemote.indexOf("/gcodes/") >= 0
+    ? 'M32 "' + S.uploadedRemote + '"' : 'M98 P"' + S.uploadedRemote + '"';
   S.busy = true; updateButtons();
   try {
     let st = await api.model("state.status");
@@ -810,6 +801,8 @@ $("btnResume").onclick = async () => {
     log("Sending " + startCmd + " …");
     const reply = await api.gcode(startCmd);
     if (reply) log("Printer replied: " + reply);
+    if (/^error/i.test(reply)) throw new Error("The printer refused " + startCmd + ": " + reply +
+      " — the job is cancelled; if nothing has moved, fix the cause and send " + startCmd + " from the console.");
     await sleep(1500);
     st = await api.model("state.status");
     setMsg("sendMsg", "Printer status: <b>" + esc(st) + "</b>" + (st === "processing" ? ' <span class="ok">✓ printing</span>' : ""),
